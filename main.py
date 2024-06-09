@@ -21,6 +21,19 @@ class DungeonApp:
         # Load all dungeons by default
         self.load_all_dungeons()
 
+    def treeview_sort_column(self, col, reverse):
+        l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
+        l.sort(reverse=reverse, key=lambda t: t[0].lower())  # Sort by column value
+
+        # Rearrange items in sorted order
+        for index, (val, k) in enumerate(l):
+            self.tree.move(k, '', index)
+
+        # Toggle the sorting direction for the next sort operation
+        reverse = not reverse
+        # Update the header command to sort in the new order
+        self.tree.heading(col, command=lambda: self.treeview_sort_column(col, reverse))
+
     def setup_widgets(self):
         # Dropdown for item search
         self.item_var = tk.StringVar()
@@ -31,11 +44,11 @@ class DungeonApp:
         # Treeview for displaying dungeons
         self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings',
                                  height=15)
-        self.tree.heading('Glyph', text='Glyph')
-        self.tree.heading('Category', text='Category')
-        self.tree.heading('Status', text='Status')
-        self.tree.heading('Bosses', text='Bosses')
-        self.tree.heading('Notes', text='Notes')
+        self.tree.heading('Glyph', text='Glyph', command=lambda: self.treeview_sort_column('Glyph', False))
+        self.tree.heading('Category', text='Category', command=lambda: self.treeview_sort_column('Category', False))
+        self.tree.heading('Status', text='Status', command=lambda: self.treeview_sort_column('Status', False))
+        self.tree.heading('Bosses', text='Bosses', command=lambda: self.treeview_sort_column('Bosses', False))
+        self.tree.heading('Notes', text='Notes', command=lambda: self.treeview_sort_column('Notes', False))
         self.tree.column('Glyph', width=100)
         self.tree.column('Category', width=100)
         self.tree.column('Status', width=100)
@@ -76,16 +89,21 @@ class DungeonApp:
         non_matching_entries = []
         for child in self.tree.get_children():
             item_data = self.tree.item(child)['values']
-            if selected_item.lower() in item_data[4].lower():
+            # Check if the selected item is in any part of the row's data, not just the notes
+            if selected_item.lower() in ' '.join(str(v).lower() for v in item_data):
                 matching_entries.append((child, item_data))
             else:
                 non_matching_entries.append((child, item_data))
 
+        # Clear the tree and re-insert items with matches first
         self.tree.delete(*self.tree.get_children())
         for entry in matching_entries + non_matching_entries:
-            self.tree.insert('', tk.END, values=entry[1],
-                             tags=('highlight' if entry in matching_entries else 'normal',))
+            # Determine if it's a match based on whether it's in the matching entries list
+            is_match = entry in matching_entries
+            tags = ('highlight',) if is_match else ('normal',)
+            self.tree.insert('', tk.END, values=entry[1], tags=tags)
 
+        # Update the visual styling for matches
         self.tree.tag_configure('highlight', background='yellow')
         self.tree.tag_configure('normal', background='white')
 
