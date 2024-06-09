@@ -23,7 +23,7 @@ class DungeonApp:
 
     def treeview_sort_column(self, col, reverse):
         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
-        l.sort(reverse=reverse, key=lambda t: t[0].lower())  # Sort by column value
+        l.sort(reverse=reverse, key=lambda t: t[0].lower())
 
         # Rearrange items in sorted order
         for index, (val, k) in enumerate(l):
@@ -34,7 +34,7 @@ class DungeonApp:
         # Update the header command to sort in the new order
         self.tree.heading(col, command=lambda: self.treeview_sort_column(col, reverse))
 
-    def perform_search(self):
+    def perform_search(self, event=None):
         search_term = self.item_var.get()
         matching_entries = []
         non_matching_entries = []
@@ -61,13 +61,12 @@ class DungeonApp:
             self.tree.item(entry[0], tags=('highlight',))
         self.tree.tag_configure('highlight', background='yellow')
 
-
-
     def setup_widgets(self):
         # Dropdown for item search
         self.item_var = tk.StringVar()
         self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items, width=60)
         self.item_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.item_combobox.bind('<Return>', self.perform_search)  # Bind Enter key to perform search
 
         # Search button
         self.search_button = ttk.Button(self.root, text='Search', command=self.perform_search)
@@ -115,7 +114,7 @@ class DungeonApp:
 
     def format_notes(self, notes):
         # Format notes by adding new lines after certain layers
-        for layer in ['L1:', 'L1', 'L2:', 'L2', 'L3:', 'L3', 'L4:', 'L4', 'L5:', 'L5']:
+        for layer in ['L1:', 'L1', 'L2:', 'L2', 'L3:', 'L3', 'L4:', 'L4', 'L5:', 'L5', 'layer', 'Layer']:
             notes = notes.replace(layer, '\n' + layer)
         return notes
 
