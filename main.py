@@ -34,12 +34,44 @@ class DungeonApp:
         # Update the header command to sort in the new order
         self.tree.heading(col, command=lambda: self.treeview_sort_column(col, reverse))
 
+    def perform_search(self):
+        search_term = self.item_var.get()
+        matching_entries = []
+        non_matching_entries = []
+        query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
+        search_term = f'%{search_term}%'
+        self.cursor.execute(query, (search_term,))
+        results = self.cursor.fetchall()
+
+        # Re-populate the treeview with search results
+        self.tree.delete(*self.tree.get_children())
+        for row in results:
+            formatted_notes = self.format_notes(row[4])
+            self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
+
+        # Highlight the entries matching the search term
+        for child in self.tree.get_children():
+            item_data = self.tree.item(child)['values']
+            if search_term.strip('%').lower() in ' '.join(str(v).lower() for v in item_data):
+                matching_entries.append((child, item_data))
+            else:
+                non_matching_entries.append((child, item_data))
+
+        for entry in matching_entries:
+            self.tree.item(entry[0], tags=('highlight',))
+        self.tree.tag_configure('highlight', background='yellow')
+
+
+
     def setup_widgets(self):
         # Dropdown for item search
         self.item_var = tk.StringVar()
-        self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items)
-        self.item_combobox.pack(side=tk.TOP, fill=tk.X, padx=10)
-        self.item_combobox.bind('<<ComboboxSelected>>', self.highlight_items)
+        self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items, width=60)
+        self.item_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        # Search button
+        self.search_button = ttk.Button(self.root, text='Search', command=self.perform_search)
+        self.search_button.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         # Treeview for displaying dungeons
         self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings',
@@ -53,13 +85,18 @@ class DungeonApp:
         self.tree.column('Category', width=100)
         self.tree.column('Status', width=100)
         self.tree.column('Bosses', width=150)
-        self.tree.column('Notes', width=500)  # Increased width for Notes
-        self.tree.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.tree.column('Notes', width=500)
+        self.tree.grid(row=1, column=0, columnspan=2, sticky='nsew', padx=10, pady=10)
+
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
         # Detail frame for displaying full note on row click
         self.detail_frame = tk.Text(self.root, height=10, wrap='word')
-        self.detail_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+        self.detail_frame.grid(row=2, column=0, columnspan=2, sticky='nsew', padx=10, pady=10)
+
+        # Configure grid column configuration
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=0)
 
     def load_items(self):
         # This function loads all unique items mentioned in the notes
@@ -103,16 +140,24 @@ class DungeonApp:
             tags = ('highlight',) if is_match else ('normal',)
             self.tree.insert('', tk.END, values=entry[1], tags=tags)
 
+        # Refresh the binding to ensure it remains after updating the treeview
+        self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
+
         # Update the visual styling for matches
         self.tree.tag_configure('highlight', background='yellow')
         self.tree.tag_configure('normal', background='white')
 
     def on_tree_select(self, event):
-        # Display detailed notes when a tree row is selected
-        selected_item = self.tree.selection()
-        item_data = self.tree.item(selected_item)['values']
-        self.detail_frame.delete('1.0', tk.END)
-        self.detail_frame.insert(tk.END, item_data[-1])
+        # Get the selected item
+        selected_item = self.tree.selection()[0] if self.tree.selection() else None
+        if selected_item:
+            item_data = self.tree.item(selected_item)['values']
+            # Clear the detail frame and insert detailed notes
+            self.detail_frame.delete('1.0', tk.END)
+            self.detail_frame.insert(tk.END, item_data[-1])  # Assuming the last index has the notes
+        else:
+            self.detail_frame.delete('1.0', tk.END)
+            self.detail_frame.insert(tk.END, "No item selected or available.")
 
     def on_closing(self):
         self.conn.close()
