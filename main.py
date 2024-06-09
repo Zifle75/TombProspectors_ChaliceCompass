@@ -18,8 +18,12 @@ class DungeonApp:
         # GUI Setup
         self.setup_widgets()
 
+        # Store last search term used
+        self.last_search_term = ""
+
         # Load all dungeons by default
         self.load_all_dungeons()
+
 
     def treeview_sort_column(self, col, reverse):
         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
@@ -36,6 +40,7 @@ class DungeonApp:
 
     def perform_search(self, event=None):
         search_term = self.item_var.get()
+        self.last_search_term = search_term
         matching_entries = []
         non_matching_entries = []
         query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
@@ -66,7 +71,8 @@ class DungeonApp:
         self.item_var = tk.StringVar()
         self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items, width=60)
         self.item_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        self.item_combobox.bind('<Return>', self.perform_search)  # Bind Enter key to perform search
+        # Bind Enter key to perform search
+        self.item_combobox.bind('<Return>', self.perform_search)
 
         # Search button
         self.search_button = ttk.Button(self.root, text='Search', command=self.perform_search)
@@ -118,14 +124,27 @@ class DungeonApp:
             notes = notes.replace(layer, '\n' + layer)
         return notes
 
+    def highlight_text(self, search_term):
+        """Highlights the search term in the detailed notes."""
+        if not search_term:
+            return  # If there is no search term, do nothing
+
+        start = '1.0'
+        while True:
+            pos = self.detail_frame.search(search_term, start, stopindex=tk.END, nocase=True)
+            if not pos:
+                break
+            end = f"{pos}+{len(search_term)}c"
+            self.detail_frame.tag_add('highlight', pos, end)
+            start = end
+        self.detail_frame.tag_configure('highlight', background='yellow')
+
     def highlight_items(self, event=None):
-        # Highlight items in the notes that match the selected item in the dropdown
         selected_item = self.item_var.get()
         matching_entries = []
         non_matching_entries = []
         for child in self.tree.get_children():
             item_data = self.tree.item(child)['values']
-            # Check if the selected item is in any part of the row's data, not just the notes
             if selected_item.lower() in ' '.join(str(v).lower() for v in item_data):
                 matching_entries.append((child, item_data))
             else:
@@ -139,12 +158,12 @@ class DungeonApp:
             tags = ('highlight',) if is_match else ('normal',)
             self.tree.insert('', tk.END, values=entry[1], tags=tags)
 
+        # Update the visual styling for matches
+        self.tree.tag_configure('highlight', background='#f0f0f0')  # Subtle gray background
+        self.tree.tag_configure('normal', background='white')
+
         # Refresh the binding to ensure it remains after updating the treeview
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
-
-        # Update the visual styling for matches
-        self.tree.tag_configure('highlight', background='yellow')
-        self.tree.tag_configure('normal', background='white')
 
     def on_tree_select(self, event):
         # Get the selected item
@@ -154,6 +173,8 @@ class DungeonApp:
             # Clear the detail frame and insert detailed notes
             self.detail_frame.delete('1.0', tk.END)
             self.detail_frame.insert(tk.END, item_data[-1])  # Assuming the last index has the notes
+            self.highlight_text(self.last_search_term)  # Highlight the search term within the notes
+
         else:
             self.detail_frame.delete('1.0', tk.END)
             self.detail_frame.insert(tk.END, "No item selected or available.")
