@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import tkinter as tk
 from tkinter import ttk
@@ -22,7 +23,8 @@ class DungeonApp:
         self.root.title("Chalice Compass")
 
         # Set up the database connection
-        self.conn = sqlite3.connect('ChaliceCompass.db')
+        self.db_path = os.path.join(os.path.dirname(__file__), 'ChaliceCompass.db')
+        self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
 
         # Load all equipment types for the type dropdown
