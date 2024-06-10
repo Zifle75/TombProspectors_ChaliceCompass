@@ -2,6 +2,19 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk
 
+LAYER_COLORS = {
+    'L1': '#add8e6',  # Light blue
+    'L1:': '#add8e6',
+    'L2': '#90ee90',  # Light green
+    'L2:': '#90ee90',
+    'L3': '#ffcccb',  # Light red
+    'L3:': '#ffcccb',
+    'L4': '#ffa500',  # Orange
+    'L4:': '#ffa500',
+    'L5': '#d3d3d3',  # Light grey
+    'L5:': '#d3d3d3'
+}
+
 
 class DungeonApp:
     def __init__(self, root):
@@ -23,7 +36,6 @@ class DungeonApp:
 
         # Load all dungeons by default
         self.load_all_dungeons()
-
 
     def treeview_sort_column(self, col, reverse):
         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
@@ -124,20 +136,22 @@ class DungeonApp:
             notes = notes.replace(layer, '\n' + layer)
         return notes
 
-    def highlight_text(self, search_term):
-        """Highlights the search term in the detailed notes."""
-        if not search_term:
-            return  # If there is no search term, do nothing
+    def highlight_text(self, terms_tags):
+        """Highlights the search terms in the detailed notes with the specified tags."""
+        if not terms_tags:
+            return  # If there are no terms, do nothing
 
-        start = '1.0'
-        while True:
-            pos = self.detail_frame.search(search_term, start, stopindex=tk.END, nocase=True)
-            if not pos:
-                break
-            end = f"{pos}+{len(search_term)}c"
-            self.detail_frame.tag_add('highlight', pos, end)
-            start = end
-        self.detail_frame.tag_configure('highlight', background='yellow')
+        for term, tag in terms_tags.items():
+            if not term:  # Skip empty terms
+                continue
+            start = '1.0'
+            while True:
+                pos = self.detail_frame.search(term, start, stopindex=tk.END, nocase=True)
+                if not pos:
+                    break
+                end = f"{pos}+{len(term)}c"
+                self.detail_frame.tag_add(tag, pos, end)
+                start = end
 
     def highlight_items(self, event=None):
         selected_item = self.item_var.get()
@@ -166,15 +180,24 @@ class DungeonApp:
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
     def on_tree_select(self, event):
-        # Get the selected item
         selected_item = self.tree.selection()[0] if self.tree.selection() else None
         if selected_item:
             item_data = self.tree.item(selected_item)['values']
-            # Clear the detail frame and insert detailed notes
-            self.detail_frame.delete('1.0', tk.END)
-            self.detail_frame.insert(tk.END, item_data[-1])  # Assuming the last index has the notes
-            self.highlight_text(self.last_search_term)  # Highlight the search term within the notes
+            notes = self.format_notes(item_data[-1])  # Assuming the last index has the notes
 
+            self.detail_frame.delete('1.0', tk.END)
+            self.detail_frame.insert(tk.END, notes)  # Insert formatted notes
+
+            # Highlight search terms
+            self.highlight_text({self.last_search_term: 'search_highlight'})
+
+            # Highlight layer terms
+            self.highlight_text({layer: layer for layer in LAYER_COLORS.keys()})
+
+            # Configure tag styles
+            self.detail_frame.tag_configure('search_highlight', background='yellow')
+            for layer, color in LAYER_COLORS.items():
+                self.detail_frame.tag_configure(layer, background=color)
         else:
             self.detail_frame.delete('1.0', tk.END)
             self.detail_frame.insert(tk.END, "No item selected or available.")
