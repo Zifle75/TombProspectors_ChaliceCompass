@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('ChaliceCompass.db', '.')],
+    datas=[('ChaliceCompass.db', '.'), ('ChaliceCompass_backup.db', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
