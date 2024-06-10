@@ -1,7 +1,9 @@
+import os
 import sqlite3
+import sys
+import threading
 import tkinter as tk
 from tkinter import ttk
-import threading
 
 LAYER_COLORS = {
     'L1': '#add8e6',  # Light blue
@@ -23,13 +25,18 @@ class DungeonApp:
         self.root.title("Chalice Compass")
 
         self.db_lock = threading.Lock()
-        self.db_paths = ['ChaliceCompass.db', 'ChaliceCompass_backup.db']
+
+        # Set up the database connection
+        self.db_paths = [self.resource_path('ChaliceCompass.db'), self.resource_path('ChaliceCompass_backup.db')]
         self.conn = None
         self.cursor = None
         self.connect_to_db()
 
+        # Load all equipment types for the type dropdown
+        self.equipment_types = self.load_equipment_types()
+
         # Load all items for the search dropdown
-        self.items = self.load_items()
+        self.items = []
 
         # GUI Setup
         self.setup_widgets()
@@ -40,12 +47,22 @@ class DungeonApp:
         # Load all dungeons by default
         self.load_all_dungeons()
 
+    def resource_path(self, relative_path):
+        """ Get the absolute path to a resource, works for dev and for PyInstaller """
+        try:
+            # PyInstaller creates a temp folder and stores path in _MEIPASS
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+
+        return os.path.join(base_path, relative_path)
+
     def connect_to_db(self):
         for db_path in self.db_paths:
             try:
-                self.conn = sqlite3.connect(db_path)
+                self.conn = sqlite3.connect(db_path, check_same_thread=False)
                 self.cursor = self.conn.cursor()
-                break
+                return
             except sqlite3.Error as e:
                 print(f"Failed to connect to {db_path}: {e}")
         if not self.conn:
@@ -65,14 +82,17 @@ class DungeonApp:
         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
         l.sort(reverse=reverse, key=lambda t: t[0].lower())
 
+        # Rearrange items in sorted order
         for index, (val, k) in enumerate(l):
             self.tree.move(k, '', index)
 
+        # Toggle the sorting direction for the next sort operation
         reverse = not reverse
+        # Update the header command to sort in the new order
         self.tree.heading(col, command=lambda: self.treeview_sort_column(col, reverse))
 
     def perform_search(self, event=None):
-        search_term = self.search_var.get()
+        search_term = self.item_var.get()
         self.last_search_term = search_term
         query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
         results = self.execute_query(query, (f'%{search_term}%',))
@@ -82,24 +102,65 @@ class DungeonApp:
             formatted_notes = self.format_notes(row[4])
             self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
 
+    def perform_item_search(self):
+        selected_item = self.item_var.get()
+        self.last_search_term = selected_item
+        query = """
+        SELECT Dungeon.Glyph, Dungeon.Category, Dungeon.Status, Dungeon.Bosses, Dungeon.Notes
+        FROM Dungeon
+        JOIN Dungeon_Equipment ON Dungeon.Glyph = Dungeon_Equipment.Glyph
+        WHERE Dungeon_Equipment.EquipmentName = ?
+        """
+        results = self.execute_query(query, (selected_item,))
+
+        self.tree.delete(*self.tree.get_children())
+        for row in results:
+            formatted_notes = self.format_notes(row[4])
+            self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
+
+    def reset_app(self):
+        self.item_var.set('')
+        self.equipment_type_var.set('')
+        self.last_search_term = ''
+        self.detail_frame.delete('1.0', tk.END)
+        self.tree.delete(*self.tree.get_children())  # Clear the treeview
+        self.load_all_dungeons()  # Reload all dungeons
+        self.tree.tag_configure('highlight', background='white')  # Reset highlights
+
     def setup_widgets(self):
+        # Dropdown for equipment type search
+        self.equipment_type_var = tk.StringVar()
+        self.equipment_type_combobox = ttk.Combobox(self.root, textvariable=self.equipment_type_var,
+                                                    values=self.equipment_types, width=60)
+        self.equipment_type_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.equipment_type_combobox.bind('<<ComboboxSelected>>', self.update_item_dropdown)
+
+        # Dropdown for item search
         self.item_var = tk.StringVar()
-        self.search_var = tk.StringVar()
-
         self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items, width=60)
-        self.item_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.item_combobox.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Bind Enter key to perform search
+        self.item_combobox.bind('<Return>', self.perform_item_search)
 
-        self.search_entry = ttk.Entry(self.root, textvariable=self.search_var, width=60)
-        self.search_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-        self.search_entry.bind('<Return>', self.perform_search)
-
-        self.search_button = ttk.Button(self.root, text='Search', command=self.perform_search)
+        # Search button
+        self.search_button = ttk.Button(self.root, text='Search by String', command=self.perform_search)
         self.search_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
 
-        self.reset_button = ttk.Button(self.root, text='Reset', command=self.reset)
-        self.reset_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+        # Item search button
+        self.item_search_button = ttk.Button(self.root, text='Search by Equipment', command=self.perform_item_search)
+        self.item_search_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
 
-        self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings', height=15)
+        # Reset button
+        self.reset_button = ttk.Button(self.root, text='Reset', command=self.reset_app)
+        self.reset_button.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
+
+        # Update status button
+        self.update_status_button = ttk.Button(self.root, text='Toggle Status', command=self.update_dungeon_status)
+        self.update_status_button.grid(row=0, column=5, padx=10, pady=10, sticky="ew")
+
+        # Treeview for displaying dungeons
+        self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings',
+                                 height=15)
         self.tree.heading('Glyph', text='Glyph', command=lambda: self.treeview_sort_column('Glyph', False))
         self.tree.heading('Category', text='Category', command=lambda: self.treeview_sort_column('Category', False))
         self.tree.heading('Status', text='Status', command=lambda: self.treeview_sort_column('Status', False))
@@ -110,25 +171,40 @@ class DungeonApp:
         self.tree.column('Status', width=100)
         self.tree.column('Bosses', width=150)
         self.tree.column('Notes', width=500)
-        self.tree.grid(row=1, column=0, columnspan=4, sticky='nsew', padx=10, pady=10)
+        self.tree.grid(row=1, column=0, columnspan=6, sticky='nsew', padx=10, pady=10)
 
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
+        # Detail frame for displaying full note on row click
         self.detail_frame = tk.Text(self.root, height=10, wrap='word')
-        self.detail_frame.grid(row=2, column=0, columnspan=4, sticky='nsew', padx=10, pady=10)
+        self.detail_frame.grid(row=2, column=0, columnspan=6, sticky='nsew', padx=10, pady=10)
 
-        self.update_status_button = ttk.Button(self.root, text='Update Status', command=self.update_dungeon_status)
-        self.update_status_button.grid(row=3, column=0, columnspan=4, padx=10, pady=10, sticky="ew")
-
+        # Configure grid column configuration
         self.root.grid_columnconfigure(0, weight=1)
-        self.root.grid_columnconfigure(1, weight=1)
-        self.root.grid_columnconfigure(2, weight=1)
-        self.root.grid_columnconfigure(3, weight=1)
+        self.root.grid_columnconfigure(1, weight=0)
+        self.root.grid_columnconfigure(2, weight=0)
+        self.root.grid_columnconfigure(3, weight=0)
+        self.root.grid_columnconfigure(4, weight=0)
+        self.root.grid_columnconfigure(5, weight=0)
 
-    def load_items(self):
-        query = "SELECT DISTINCT EquipmentName FROM Equipment"
+        # Configure grid column configuration
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=0)
+        self.root.grid_columnconfigure(2, weight=0)
+        self.root.grid_columnconfigure(3, weight=0)
+        self.root.grid_columnconfigure(4, weight=0)
+
+    def load_equipment_types(self):
+        query = "SELECT DISTINCT Category FROM Equipment"
         records = self.execute_query(query)
-        return [item[0] for item in records]
+        return [category[0] for category in records]
+
+    def update_item_dropdown(self, event=None):
+        selected_type = self.equipment_type_var.get()
+        query = "SELECT EquipmentName FROM Equipment WHERE Category = ?"
+        records = self.execute_query(query, (selected_type,))
+        self.items = [item[0] for item in records]
+        self.item_combobox['values'] = self.items
 
     def load_all_dungeons(self):
         query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon"
@@ -192,12 +268,6 @@ class DungeonApp:
             self.execute_query(query, (new_status, item_data[0]))
             self.load_all_dungeons()
             self.detail_frame.insert(tk.END, f"\nStatus updated to {new_status}")
-
-    def reset(self):
-        self.search_var.set("")
-        self.item_var.set("")
-        self.load_all_dungeons()
-        self.detail_frame.delete('1.0', tk.END)
 
     def on_closing(self):
         self.conn.close()
