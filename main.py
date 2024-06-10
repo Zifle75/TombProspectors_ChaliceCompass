@@ -154,6 +154,10 @@ class DungeonApp:
         self.reset_button = ttk.Button(self.root, text='Reset', command=self.reset_app)
         self.reset_button.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
 
+        # Update status button
+        self.update_status_button = ttk.Button(self.root, text='Toggle Status', command=self.update_dungeon_status)
+        self.update_status_button.grid(row=0, column=5, padx=10, pady=10, sticky="ew")
+
         # Treeview for displaying dungeons
         self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings',
                                  height=15)
@@ -167,13 +171,21 @@ class DungeonApp:
         self.tree.column('Status', width=100)
         self.tree.column('Bosses', width=150)
         self.tree.column('Notes', width=500)
-        self.tree.grid(row=1, column=0, columnspan=5, sticky='nsew', padx=10, pady=10)
+        self.tree.grid(row=1, column=0, columnspan=6, sticky='nsew', padx=10, pady=10)
 
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
         # Detail frame for displaying full note on row click
         self.detail_frame = tk.Text(self.root, height=10, wrap='word')
-        self.detail_frame.grid(row=2, column=0, columnspan=5, sticky='nsew', padx=10, pady=10)
+        self.detail_frame.grid(row=2, column=0, columnspan=6, sticky='nsew', padx=10, pady=10)
+
+        # Configure grid column configuration
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=0)
+        self.root.grid_columnconfigure(2, weight=0)
+        self.root.grid_columnconfigure(3, weight=0)
+        self.root.grid_columnconfigure(4, weight=0)
+        self.root.grid_columnconfigure(5, weight=0)
 
         # Configure grid column configuration
         self.root.grid_columnconfigure(0, weight=1)
