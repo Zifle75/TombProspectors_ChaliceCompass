@@ -25,8 +25,11 @@ class DungeonApp:
         self.conn = sqlite3.connect('ChaliceCompass.db')
         self.cursor = self.conn.cursor()
 
+        # Load all equipment types for the type dropdown
+        self.equipment_types = self.load_equipment_types()
+
         # Load all items for the search dropdown
-        self.items = self.load_items()
+        self.items = []
 
         # GUI Setup
         self.setup_widgets()
@@ -53,6 +56,8 @@ class DungeonApp:
     def perform_search(self, event=None):
         search_term = self.item_var.get()
         self.last_search_term = search_term
+        matching_entries = []
+        non_matching_entries = []
         query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
         search_term = f'%{search_term}%'
         self.cursor.execute(query, (search_term,))
@@ -68,23 +73,24 @@ class DungeonApp:
         for child in self.tree.get_children():
             item_data = self.tree.item(child)['values']
             if search_term.strip('%').lower() in ' '.join(str(v).lower() for v in item_data):
-                self.tree.item(child, tags=('highlight',))
+                matching_entries.append((child, item_data))
             else:
-                self.tree.item(child, tags=('normal',))
+                non_matching_entries.append((child, item_data))
 
+        for entry in matching_entries:
+            self.tree.item(entry[0], tags=('highlight',))
         self.tree.tag_configure('highlight', background='yellow')
-        self.tree.tag_configure('normal', background='white')
 
     def perform_item_search(self):
         selected_item = self.item_var.get()
+        self.last_search_term = selected_item
         query = """
-        SELECT d.Glyph, d.Category, d.Status, d.Bosses, d.Notes 
-        FROM Dungeon d
-        JOIN Dungeon_Equipment de ON d.Glyph = de.Glyph
-        WHERE de.EquipmentName LIKE ?
+        SELECT Dungeon.Glyph, Dungeon.Category, Dungeon.Status, Dungeon.Bosses, Dungeon.Notes
+        FROM Dungeon
+        JOIN Dungeon_Equipment ON Dungeon.Glyph = Dungeon_Equipment.Glyph
+        WHERE Dungeon_Equipment.EquipmentName = ?
         """
-        search_term = f'%{selected_item}%'
-        self.cursor.execute(query, (search_term,))
+        self.cursor.execute(query, (selected_item,))
         results = self.cursor.fetchall()
 
         # Re-populate the treeview with search results
@@ -96,27 +102,45 @@ class DungeonApp:
         # Highlight the entries matching the search term
         for child in self.tree.get_children():
             item_data = self.tree.item(child)['values']
-            if selected_item.strip('%').lower() in ' '.join(str(v).lower() for v in item_data):
+            if selected_item.lower() in ' '.join(str(v).lower() for v in item_data):
                 self.tree.item(child, tags=('highlight',))
-            else:
-                self.tree.item(child, tags=('normal',))
 
-        self.tree.tag_configure('highlight', background='yellow')
-        self.tree.tag_configure('normal', background='white')
+        self.tree.tag_configure('highlight', background='#f0f0f0')  # Subtle gray background
+
+    def reset_app(self):
+        self.item_var.set('')
+        self.equipment_type_var.set('')
+        self.last_search_term = ''
+        self.detail_frame.delete('1.0', tk.END)
+        self.tree.delete(*self.tree.get_children())  # Clear the treeview
+        self.load_all_dungeons()  # Reload all dungeons
+        self.tree.tag_configure('highlight', background='white')  # Reset highlights
 
     def setup_widgets(self):
+        # Dropdown for equipment type search
+        self.equipment_type_var = tk.StringVar()
+        self.equipment_type_combobox = ttk.Combobox(self.root, textvariable=self.equipment_type_var, values=self.equipment_types, width=60)
+        self.equipment_type_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.equipment_type_combobox.bind('<<ComboboxSelected>>', self.update_item_dropdown)
+
         # Dropdown for item search
         self.item_var = tk.StringVar()
         self.item_combobox = ttk.Combobox(self.root, textvariable=self.item_var, values=self.items, width=60)
-        self.item_combobox.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self.item_combobox.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
         # Bind Enter key to perform search
-        self.item_combobox.bind('<Return>', self.perform_search)
+        self.item_combobox.bind('<Return>', self.perform_item_search)
 
-        # Search buttons
-        self.search_button = ttk.Button(self.root, text='Search Notes', command=self.perform_search)
-        self.search_button.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        # Search button
+        self.search_button = ttk.Button(self.root, text='Search', command=self.perform_search)
+        self.search_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+
+        # Item search button
         self.item_search_button = ttk.Button(self.root, text='Search Item', command=self.perform_item_search)
-        self.item_search_button.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
+        self.item_search_button.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
+
+        # Reset button
+        self.reset_button = ttk.Button(self.root, text='Reset', command=self.reset_app)
+        self.reset_button.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
 
         # Treeview for displaying dungeons
         self.tree = ttk.Treeview(self.root, columns=('Glyph', 'Category', 'Status', 'Bosses', 'Notes'), show='headings',
@@ -131,25 +155,35 @@ class DungeonApp:
         self.tree.column('Status', width=100)
         self.tree.column('Bosses', width=150)
         self.tree.column('Notes', width=500)
-        self.tree.grid(row=1, column=0, columnspan=3, sticky='nsew', padx=10, pady=10)
+        self.tree.grid(row=1, column=0, columnspan=5, sticky='nsew', padx=10, pady=10)
 
         self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
 
         # Detail frame for displaying full note on row click
         self.detail_frame = tk.Text(self.root, height=10, wrap='word')
-        self.detail_frame.grid(row=2, column=0, columnspan=3, sticky='nsew', padx=10, pady=10)
+        self.detail_frame.grid(row=2, column=0, columnspan=5, sticky='nsew', padx=10, pady=10)
 
         # Configure grid column configuration
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_columnconfigure(1, weight=0)
         self.root.grid_columnconfigure(2, weight=0)
+        self.root.grid_columnconfigure(3, weight=0)
+        self.root.grid_columnconfigure(4, weight=0)
 
-    def load_items(self):
-        # This function loads all unique items mentioned in the notes
-        query = "SELECT DISTINCT EquipmentName FROM Equipment"
+    def load_equipment_types(self):
+        # This function loads all unique equipment types
+        query = "SELECT DISTINCT Category FROM Equipment"
         self.cursor.execute(query)
         records = self.cursor.fetchall()
-        return [item[0] for item in records]
+        return [category[0] for category in records]
+
+    def update_item_dropdown(self, event=None):
+        selected_type = self.equipment_type_var.get()
+        query = "SELECT EquipmentName FROM Equipment WHERE Category = ?"
+        self.cursor.execute(query, (selected_type,))
+        records = self.cursor.fetchall()
+        self.items = [item[0] for item in records]
+        self.item_combobox['values'] = self.items
 
     def load_all_dungeons(self):
         # This function loads all dungeons into the treeview
@@ -171,7 +205,7 @@ class DungeonApp:
             return  # If there are no terms, do nothing
 
         for term, tag in terms_tags.items():
-            if not term:  # Skip empty terms
+            if not term:
                 continue
             start = '1.0'
             while True:
@@ -182,11 +216,38 @@ class DungeonApp:
                 self.detail_frame.tag_add(tag, pos, end)
                 start = end
 
+    def highlight_items(self, event=None):
+        selected_item = self.item_var.get()
+        matching_entries = []
+        non_matching_entries = []
+        for child in self.tree.get_children():
+            item_data = self.tree.item(child)['values']
+            if selected_item.lower() in ' '.join(str(v).lower() for v in item_data):
+                matching_entries.append((child, item_data))
+            else:
+                non_matching_entries.append((child, item_data))
+
+        # Clear the tree and re-insert items with matches first
+        self.tree.delete(*self.tree.get_children())
+        for entry in matching_entries + non_matching_entries:
+            # Determine if it's a match based on whether it's in the matching entries list
+            is_match = entry in matching_entries
+            tags = ('highlight',) if is_match else ('normal',)
+            self.tree.insert('', tk.END, values=entry[1], tags=tags)
+
+        # Update the visual styling for matches
+        self.tree.tag_configure('highlight', background='#f0f0f0')  # Subtle gray background
+        self.tree.tag_configure('normal', background='white')
+
+        # Refresh the binding to ensure it remains after updating the treeview
+        self.tree.bind('<<TreeviewSelect>>', self.on_tree_select)
+
     def on_tree_select(self, event):
         selected_item = self.tree.selection()[0] if self.tree.selection() else None
         if selected_item:
             item_data = self.tree.item(selected_item)['values']
             notes = self.format_notes(item_data[-1])  # Assuming the last index has the notes
+
             self.detail_frame.delete('1.0', tk.END)
             self.detail_frame.insert(tk.END, notes)  # Insert formatted notes
 
@@ -194,8 +255,7 @@ class DungeonApp:
             self.highlight_text({self.last_search_term: 'search_highlight'})
 
             # Highlight layer terms
-            layer_terms = {layer: layer for layer in LAYER_COLORS.keys()}
-            self.highlight_text(layer_terms)
+            self.highlight_text({layer: layer for layer in LAYER_COLORS.keys()})
 
             # Configure tag styles
             self.detail_frame.tag_configure('search_highlight', background='yellow')
@@ -209,13 +269,14 @@ class DungeonApp:
         self.conn.close()
         self.root.destroy()
 
+
 def main():
     root = tk.Tk()
     app = DungeonApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
 
+
 if __name__ == "__main__":
     main()
-
 
