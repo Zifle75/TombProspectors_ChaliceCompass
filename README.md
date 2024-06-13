@@ -31,14 +31,15 @@ Troubleshooting
 Antivirus Warnings: Some antivirus programs may flag the executable file. If this occurs, you may need to whitelist the file or disable your antivirus temporarily to run the application.
 Python: You might need python to run the program.
 
+# Future Plans
 It's pretty elementary stuff, but if this tool picks up, here are some improvements I'll need to make.
-Future enhancements may include:
 
 Integration with External Data Sources: Some way to automate datatransfer from bloodsheets.xlsx
 Code Certificate: I need to pay for an evaluation of the code so that my program doesn't get flagged as a virus.
 Redis Cache Layer: Implementing a Redis cache to improve read performance and handle higher request rates.
 Migration to PostgreSQL: Transitioning to a more robust database system like PostgreSQL to support higher throughput and better performance. 
 Move Primary Database to Online Server, keep local copy: This would allow for automatic data updates rather than everyone having their own local copy.
+Make more easily accessible and build it to run on different OS.
 
 The Chalice Compass tool aims to assist players in navigating game dungeons more efficiently, ultimately enhancing their gaming experience.
 
