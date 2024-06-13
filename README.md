@@ -3,11 +3,14 @@ Chalice Compass is a tool designed for Bloodborne players, enabling them to sear
 
 
 # Installation Instructions
-I tried to build the exectuably for Windows, Mac, and Linux, but I've only tested it on windows. Theoretically it can do more but leave a comment here if it doesn't work.
+Download and run the ChaliceCompass_(VersionNumber).exe
 
-Troubleshooting
-Antivirus Warnings: Some antivirus programs may flag the executable file. If this occurs, you may need to whitelist the file or disable your antivirus temporarily to run the application.
-Python: You might need python to run the program.
+### Troubleshooting Common Issues
+- **Issue 1**: Antivirus softwares think this tool is a trojan horse. You might need to whitelist it to get it to work.
+- **Issue 2**: Code is untested on Linux and Mac. If it doesn't work, try windows until I fix it
+
+### Feedback
+Things are pretty simple and janky right now, so feedback would be appreciated. Open an issue or suggest improvements here: https://github.com/Zifle75/TombProspectors_ChaliceCompass/issues
 
 # Future Plans
 It's pretty elementary stuff, but if this tool picks up, here are some improvements I'll need to make.
@@ -18,5 +21,4 @@ Redis Cache Layer: Implementing a Redis cache to improve read performance and ha
 Migration to PostgreSQL: Transitioning to a more robust database system like PostgreSQL to support higher throughput and better performance. 
 Move Primary Database to Online Server, keep local copy: This would allow for automatic data updates rather than everyone having their own local copy.
 Make more easily accessible and build it to run on different OS.
-
 
