@@ -5,6 +5,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
+# Color array for distinguishing Layers in notes
 LAYER_COLORS = {
     'L1': '#add8e6',  # Light blue
     'L1:': '#add8e6',
@@ -24,6 +25,10 @@ class DungeonApp:
         self.root = root
         self.root.title("Chalice Compass")
 
+        # Set Icon to free use compass online
+        self.root.iconbitmap(self.resource_path('compass.ico'))
+
+        # Enable threading
         self.db_lock = threading.Lock()
 
         # Set up the database connection
@@ -32,10 +37,10 @@ class DungeonApp:
         self.cursor = None
         self.connect_to_db()
 
-        # Load all equipment types for the type dropdown
+        # Load all equipment types for the equipment type dropdown
         self.equipment_types = self.load_equipment_types()
 
-        # Load all items for the search dropdown
+        # Initialize items for search dropdown
         self.items = []
 
         # GUI Setup
@@ -58,6 +63,8 @@ class DungeonApp:
         return os.path.join(base_path, relative_path)
 
     def connect_to_db(self):
+        """ First connect to primary db, if that doesn't work, use local backup """
+        # TODO: Implement live server as primarydb rather than a local copy
         for db_path in self.db_paths:
             try:
                 self.conn = sqlite3.connect(db_path, check_same_thread=False)
@@ -69,6 +76,7 @@ class DungeonApp:
             raise Exception("Failed to connect to any database.")
 
     def execute_query(self, query, params=()):
+        """ Executes query on db in use"""
         with self.db_lock:
             try:
                 self.cursor.execute(query, params)
@@ -79,6 +87,7 @@ class DungeonApp:
                 self.connect_to_db()
 
     def treeview_sort_column(self, col, reverse):
+        """ Adds sorting functionality to tables"""
         l = [(self.tree.set(k, col), k) for k in self.tree.get_children('')]
         l.sort(reverse=reverse, key=lambda t: t[0].lower())
 
@@ -92,9 +101,10 @@ class DungeonApp:
         self.tree.heading(col, command=lambda: self.treeview_sort_column(col, reverse))
 
     def perform_search(self, event=None):
+        """ Performs a String search via SQL LIKE method"""
         search_term = self.item_var.get()
         self.last_search_term = search_term
-        query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
+        query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ? COLLATE NOCASE"
         results = self.execute_query(query, (f'%{search_term}%',))
 
         self.tree.delete(*self.tree.get_children())
@@ -103,6 +113,7 @@ class DungeonApp:
             self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
 
     def perform_item_search(self):
+        """ Performs an equipment search from Equipment dropdown, uses relationship table"""
         selected_item = self.item_var.get()
         self.last_search_term = selected_item
         query = """
@@ -119,6 +130,7 @@ class DungeonApp:
             self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
 
     def reset_app(self):
+        """ Simple resets most the initial states of the application, does not reset db"""
         self.item_var.set('')
         self.equipment_type_var.set('')
         self.last_search_term = ''
@@ -128,6 +140,7 @@ class DungeonApp:
         self.tree.tag_configure('highlight', background='white')  # Reset highlights
 
     def setup_widgets(self):
+        """ Sets up basic front end to interact with database"""
         # Dropdown for equipment type search
         self.equipment_type_var = tk.StringVar()
         self.equipment_type_combobox = ttk.Combobox(self.root, textvariable=self.equipment_type_var,
@@ -195,11 +208,13 @@ class DungeonApp:
         self.root.grid_columnconfigure(4, weight=0)
 
     def load_equipment_types(self):
+        """ Finds different categories of equipment from database"""
         query = "SELECT DISTINCT Category FROM Equipment"
         records = self.execute_query(query)
         return [category[0] for category in records]
 
     def update_item_dropdown(self, event=None):
+        """ Populates Equipment dropdown from db based on equipment type selected"""
         selected_type = self.equipment_type_var.get()
         query = "SELECT EquipmentName FROM Equipment WHERE Category = ?"
         records = self.execute_query(query, (selected_type,))
@@ -207,6 +222,7 @@ class DungeonApp:
         self.item_combobox['values'] = self.items
 
     def load_all_dungeons(self):
+        """ Loads all dungeons from db """
         query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon"
         results = self.execute_query(query)
         self.tree.delete(*self.tree.get_children())
@@ -215,11 +231,13 @@ class DungeonApp:
             self.tree.insert('', tk.END, values=(row[0], row[1], row[2], row[3], formatted_notes))
 
     def format_notes(self, notes):
+        """ Adds newlines to key strings for accessibility"""
         for layer in LAYER_COLORS.keys():
             notes = notes.replace(layer, '\n' + layer)
         return notes
 
     def highlight_text(self, terms_tags):
+        """ Simple method used to either highlight search string matches or layers"""
         if not terms_tags:
             return
 
@@ -236,6 +254,7 @@ class DungeonApp:
                 start = end
 
     def on_tree_select(self, event):
+        """ When an entry is selects, allows us to format the notes and make things more obvious to user"""
         selected_item = self.tree.selection()[0] if self.tree.selection() else None
         if selected_item:
             item_data = self.tree.item(selected_item)['values']
@@ -259,17 +278,21 @@ class DungeonApp:
             self.detail_frame.insert(tk.END, "No item selected or available.")
 
     def update_dungeon_status(self):
+        """ Allows user to mark dungeons as expired for their local copy"""
+        # TODO: Assuming we get a server, this method would have to completely change
+        #  bc the current implementation isn't wise for more than one person
         selected_item = self.tree.selection()[0] if self.tree.selection() else None
         if selected_item:
             item_data = self.tree.item(selected_item)['values']
             current_status = item_data[2]
-            new_status = 'Expired' if current_status == 'Active' else 'Active'
+            new_status = 'FLAGGED' if current_status == 'Active' else 'Active'
             query = "UPDATE Dungeon SET Status = ? WHERE Glyph = ?"
             self.execute_query(query, (new_status, item_data[0]))
             self.load_all_dungeons()
             self.detail_frame.insert(tk.END, f"\nStatus updated to {new_status}")
 
     def on_closing(self):
+        """ Closes the application like it should"""
         self.conn.close()
         self.root.destroy()
 
