@@ -104,7 +104,7 @@ class DungeonApp:
         """ Performs a String search via SQL LIKE method"""
         search_term = self.item_var.get()
         self.last_search_term = search_term
-        query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ?"
+        query = "SELECT Glyph, Category, Status, Bosses, Notes FROM Dungeon WHERE Notes LIKE ? COLLATE NOCASE"
         results = self.execute_query(query, (f'%{search_term}%',))
 
         self.tree.delete(*self.tree.get_children())

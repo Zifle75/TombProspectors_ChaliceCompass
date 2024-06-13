@@ -1,11 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+block_cipher = None
 
 a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('ChaliceCompass.db', '.'), ('ChaliceCompass_backup.db', '.')],
+    datas=[('ChaliceCompass.db', '.'), ('ChaliceCompass_backup.db', '.'), ('compass.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -13,8 +14,9 @@ a = Analysis(
     excludes=[],
     noarchive=False,
     optimize=0,
+    cipher=block_cipher,
 )
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -35,4 +37,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='compass.ico'
 )
