@@ -15,10 +15,8 @@ Things are pretty simple and janky right now, so feedback would be appreciated. 
 # Future Plans
 It's pretty elementary stuff, but if this tool picks up, here are some improvements I'll need to make.
 
-Integration with External Data Sources: Some way to automate datatransfer from bloodsheets.xlsx
-Code Certificate: I need to pay for an evaluation of the code so that my program doesn't get flagged as a virus.
-Redis Cache Layer: Implementing a Redis cache to improve read performance and handle higher request rates.
-Migration to PostgreSQL: Transitioning to a more robust database system like PostgreSQL to support higher throughput and better performance. 
-Move Primary Database to Online Server, keep local copy: This would allow for automatic data updates rather than everyone having their own local copy.
-Make more easily accessible and build it to run on different OS.
-
+- Integration with External Data Sources: Some way to automate datatransfer from bloodsheets.xlsx
+- Code Certificate: I need to pay for an evaluation of the code so that my program doesn't get flagged as a virus.
+- Redis Cache Layer: Implementing a Redis cache to improve read performance and handle higher request rates.
+- Migration to PostgreSQL: Transitioning to a more robust database system like PostgreSQL to support higher throughput and better performance. 
+- Move Primary Database to Online Server, keep local copy: This would allow for automatic data updates rather than everyone having their own local copy.
