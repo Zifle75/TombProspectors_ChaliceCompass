@@ -13,7 +13,7 @@ Download and run the ChaliceCompass_(VersionNumber).exe
 Things are pretty simple and janky right now, so feedback would be appreciated. Open an issue or suggest improvements here: https://github.com/Zifle75/TombProspectors_ChaliceCompass/issues
 
 # Future Plans
-It's pretty elementary stuff, but if this tool picks up, here are some improvements I'll need to make.
+It's pretty elementary stuff but if this tool picks up, here are some improvements I'll need to make.
 
 - Integration with External Data Sources: Some way to automate datatransfer from bloodsheets.xlsx
 - Code Certificate: I need to pay for an evaluation of the code so that my program doesn't get flagged as a virus.
